@@ -14,7 +14,7 @@ const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h 
 
 export function createGame(seed = 1) {
   return {
-    seed, rng: makeRng(seed), state: 'title', time: 0, best: 0, events: [], parts: [], shake: 0, freeze: 0, endT: 0, runs: 0,
+    seed, rng: makeRng(seed), state: 'title', time: 0, best: 0, events: [], parts: [], pops: [], shake: 0, freeze: 0, endT: 0, runs: 0,
     roomIndex: 0, room: null, player: createPlayer(), foes: [], shots: [], pickups: [], offers: [], taken: [], score: 0, kills: 0,
     roomTime: 0, runTime: 0, doorOpen: false, victoryT: 0,
   };
@@ -30,6 +30,7 @@ export function startRun(g, seed = g.seed + g.runs) {
   g.runTime = 0;
   g.victoryT = 0;
   g.parts.length = 0;
+  g.pops.length = 0;
   loadRoom(g, 0);
   g.state = 'playing';
   g.events.push('start');
@@ -123,6 +124,7 @@ function damageFoe(g, f, dmg, dir) {
     else f.x = Math.max(f.platform.x, Math.min(f.platform.x + f.platform.w - f.w, f.x + dir * 14));
   }
   burst(g, f.x + f.w / 2, f.y + f.h / 2, '#ffe2a8', 7, 220);
+  g.pops.push({ x: f.x + f.w / 2, y: f.y - 4, text: String(Math.round(dmg)), life: 0.7, big: dmg >= 16 });
   g.events.push('hit');
   g.freeze = Math.max(g.freeze, f.hp <= 0 ? 0.07 : 0.04);
   if (f.hp <= 0) killFoe(g, f);
@@ -162,6 +164,12 @@ function updatePickups(g, dt) {
 }
 
 function updateParts(g, dt) {
+  for (let i = g.pops.length - 1; i >= 0; i--) {
+    const q = g.pops[i];
+    q.life -= dt;
+    q.y -= 46 * dt;
+    if (q.life <= 0) g.pops.splice(i, 1);
+  }
   for (let i = g.parts.length - 1; i >= 0; i--) {
     const q = g.parts[i];
     q.life -= dt;
@@ -230,7 +238,17 @@ export function step(g, input, dt) {
     pickUpgrade(g, input);
     return;
   }
-  if (g.freeze > 0) { g.freeze -= dt; return; }
+  // Hit stop freezes the action, but a press made during it is kept for the first step after it.
+  if (g.freeze > 0) {
+    g.freeze -= dt;
+    g.buffered = g.buffered || {};
+    for (const key of ['jumpPressed', 'attackPressed', 'dashPressed']) if (input[key]) g.buffered[key] = true;
+    return;
+  }
+  if (g.buffered) {
+    input = { ...input, jumpPressed: input.jumpPressed || Boolean(g.buffered.jumpPressed), attackPressed: input.attackPressed || Boolean(g.buffered.attackPressed), dashPressed: input.dashPressed || Boolean(g.buffered.dashPressed) };
+    g.buffered = null;
+  }
 
   g.roomTime += dt;
   g.runTime += dt;

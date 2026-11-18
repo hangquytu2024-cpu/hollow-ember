@@ -3,6 +3,12 @@
 import { COLOR, GROUND_Y, H, PLAYER, W } from './config.js';
 import { DOOR } from './game.js';
 
+/** The hero and the small foes are drawn a little larger than their hit boxes so they read at a glance. */
+const SPRITE = 1.3;
+
+/** Each chamber tints the lower sky differently, so the descent has a sense of depth. */
+const SKY_BOTTOM = [COLOR.skyBottom, '#12304a', '#243a22', '#3a2a14'];
+
 const hash = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 
 function rect(ctx, x, y, w, h, fill) {
@@ -23,7 +29,7 @@ function glow(ctx, x, y, r, color, alpha) {
 function drawBackground(ctx, g) {
   const sky = ctx.createLinearGradient(0, 0, 0, H);
   sky.addColorStop(0, COLOR.skyTop);
-  sky.addColorStop(1, g.room && g.room.boss ? '#3a1020' : COLOR.skyBottom);
+  sky.addColorStop(1, g.room && g.room.boss ? '#3a1020' : SKY_BOTTOM[g.room ? g.room.index % SKY_BOTTOM.length : 0]);
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, W, H);
   const shift = g.room ? g.room.seedShift : 0;
@@ -89,7 +95,7 @@ function drawHero(ctx, g) {
   ctx.globalAlpha = blink ? 0.35 : 1;
   ctx.save();
   ctx.translate(p.x + p.w / 2, p.y + p.h);
-  ctx.scale(p.face, 1);
+  ctx.scale(p.face * SPRITE, SPRITE);
   const run = p.onGround ? Math.sin(g.time * 18) * Math.min(1, Math.abs(p.vx) / 100) : 0;
   ctx.fillStyle = '#10393f';
   ctx.beginPath(); // cloak
@@ -123,7 +129,7 @@ function drawHusk(ctx, f, t) {
   const step = Math.sin(t * 10 + f.x) * 2;
   ctx.save();
   ctx.translate(f.x + f.w / 2, f.y + f.h);
-  ctx.scale(f.dir, 1);
+  ctx.scale(f.dir * SPRITE, SPRITE);
   rect(ctx, -11, -8, 7, 8 + step, '#2b1a3a');
   rect(ctx, 4, -8, 7, 8 - step, '#2b1a3a');
   ctx.fillStyle = '#3d2552';
@@ -136,7 +142,7 @@ function drawHusk(ctx, f, t) {
 function drawArcher(ctx, f) {
   ctx.save();
   ctx.translate(f.x + f.w / 2, f.y + f.h);
-  ctx.scale(f.face, 1);
+  ctx.scale(f.face * SPRITE, SPRITE);
   ctx.fillStyle = '#26324a';
   ctx.beginPath(); ctx.moveTo(-11, 0); ctx.lineTo(-3, -34); ctx.lineTo(7, -34); ctx.lineTo(11, 0); ctx.closePath(); ctx.fill();
   rect(ctx, 2, -28, 5, 3, f.aim ? COLOR.blood : COLOR.teal);
@@ -151,6 +157,7 @@ function drawBat(ctx, f, t) {
   const flap = Math.sin(t * 22 + f.phase) * 9;
   ctx.save();
   ctx.translate(f.x + f.w / 2, f.y + f.h / 2);
+  ctx.scale(SPRITE, SPRITE);
   ctx.fillStyle = f.mode === 'swoop' ? '#7a2342' : '#3a2a52';
   ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(-24, -10 + flap); ctx.lineTo(-16, 6); ctx.closePath(); ctx.fill();
   ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(24, -10 + flap); ctx.lineTo(16, 6); ctx.closePath(); ctx.fill();
@@ -224,6 +231,19 @@ function drawPickups(ctx, g) {
   }
 }
 
+function drawPops(ctx, g) {
+  ctx.textAlign = 'center';
+  for (const q of g.pops) {
+    ctx.globalAlpha = Math.min(1, q.life * 2.5);
+    ctx.font = `800 ${q.big ? 24 : 17}px Segoe UI, system-ui, Arial, sans-serif`;
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillText(q.text, q.x + 1.5, q.y + 2);
+    ctx.fillStyle = q.big ? COLOR.emberHot : '#ffffff';
+    ctx.fillText(q.text, q.x, q.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
 function drawParticles(ctx, g) {
   for (const q of g.parts) {
     ctx.globalAlpha = Math.max(0, q.life / q.max);
@@ -249,6 +269,7 @@ export function drawWorld(ctx, g) {
     drawShots(ctx, g);
   }
   drawParticles(ctx, g);
+  drawPops(ctx, g);
   ctx.restore();
   const vignette = ctx.createRadialGradient(W / 2, H / 2, H * 0.45, W / 2, H / 2, H * 0.95);
   vignette.addColorStop(0, 'rgba(0,0,0,0)');

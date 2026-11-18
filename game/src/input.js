@@ -1,31 +1,34 @@
 // Keyboard and mouse in, one snapshot per frame out. Edge presses (jump, attack, dash, confirm) are
-// remembered until the snapshot is taken, so a quick tap between two frames is never lost.
+// remembered until the snapshot is taken, so a quick tap between two frames is never lost. Keys are read
+// by physical position (event.code), so holding A and then pressing Shift never leaves a key stuck.
 const KEYS = {
-  left: ['a', 'A', 'ArrowLeft'], right: ['d', 'D', 'ArrowRight'],
-  jump: ['w', 'W', 'ArrowUp', ' '], attack: ['j', 'J', 'z', 'Z'], dash: ['k', 'K', 'x', 'X', 'Shift', 'c', 'C'],
-  confirm: ['Enter', ' '],
+  left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'],
+  jump: ['KeyW', 'ArrowUp', 'Space'], attack: ['KeyJ', 'KeyZ'], dash: ['KeyK', 'KeyX', 'KeyC', 'ShiftLeft', 'ShiftRight'],
+  confirm: ['Enter', 'NumpadEnter', 'Space'],
 };
-const GAME_KEYS = new Set(Object.values(KEYS).flat().concat(['1', '2', '3', 'p', 'P', 'Escape', 'm', 'M']));
+const PICKS = { Digit1: 1, Digit2: 2, Digit3: 3, Numpad1: 1, Numpad2: 2, Numpad3: 3 };
+const GAME_KEYS = new Set(Object.values(KEYS).flat().concat(Object.keys(PICKS), ['KeyP', 'Escape', 'KeyM']));
+const blankEdge = () => ({ jump: false, attack: false, dash: false, confirm: false, pick: 0, click: null, aimX: null, pause: false, mute: false });
 
 export function createInput(canvas, toLogical) {
   const held = new Set();
-  let edge = { jump: false, attack: false, dash: false, confirm: false, pick: 0, click: null, aimX: null, pause: false, mute: false };
+  let edge = blankEdge();
 
-  const isKey = (name, key) => KEYS[name].includes(key);
+  const isKey = (name, code) => KEYS[name].includes(code);
 
   window.addEventListener('keydown', (e) => {
-    if (GAME_KEYS.has(e.key)) e.preventDefault();
+    if (GAME_KEYS.has(e.code)) e.preventDefault();
     if (e.repeat) return;
-    held.add(e.key);
-    if (isKey('jump', e.key)) edge.jump = true;
-    if (isKey('attack', e.key)) edge.attack = true;
-    if (isKey('dash', e.key)) edge.dash = true;
-    if (isKey('confirm', e.key)) edge.confirm = true;
-    if (e.key === '1' || e.key === '2' || e.key === '3') edge.pick = Number(e.key);
-    if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') edge.pause = true;
-    if (e.key === 'm' || e.key === 'M') edge.mute = true;
+    held.add(e.code);
+    if (isKey('jump', e.code)) edge.jump = true;
+    if (isKey('attack', e.code)) edge.attack = true;
+    if (isKey('dash', e.code)) edge.dash = true;
+    if (isKey('confirm', e.code)) edge.confirm = true;
+    if (PICKS[e.code]) edge.pick = PICKS[e.code];
+    if (e.code === 'KeyP' || e.code === 'Escape') edge.pause = true;
+    if (e.code === 'KeyM') edge.mute = true;
   });
-  window.addEventListener('keyup', (e) => held.delete(e.key));
+  window.addEventListener('keyup', (e) => held.delete(e.code));
   window.addEventListener('blur', () => held.clear());
 
   canvas.addEventListener('mousedown', (e) => {
@@ -50,7 +53,7 @@ export function createInput(canvas, toLogical) {
         confirm: edge.confirm, pick: edge.pick, click: edge.click, aimX: edge.aimX,
         pause: edge.pause, mute: edge.mute,
       };
-      edge = { jump: false, attack: false, dash: false, confirm: false, pick: 0, click: null, aimX: null, pause: false, mute: false };
+      edge = blankEdge();
       return out;
     },
   };

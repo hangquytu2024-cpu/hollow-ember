@@ -1,7 +1,7 @@
 // Builds one chamber: the floor, a few floating ledges, and which foe stands on which ledge.
 import { FOES, GROUND_Y, POOLS, ROOMS, W } from './config.js';
 
-const ROWS = [405, 335, 265]; // heights a ledge can sit at, low to high; each step up is within one jump
+const ROWS = [410, 340, 275]; // heights a ledge can sit at, low to high; the top row is within a double jump of the floor
 
 /** A chamber for descent step `index` (0 based). The last one is the boss chamber. */
 export function buildRoom(index, rng) {

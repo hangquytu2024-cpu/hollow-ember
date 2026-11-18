@@ -66,16 +66,22 @@ function play() {
   window.addEventListener('keydown', unlock);
   canvas.addEventListener('mousedown', unlock);
 
+  // Presses that arrive on a frame with no simulation step (a 144 Hz screen) wait here for the next step.
+  let carry = null;
+  const merge = (a, b) => (a ? { ...b, jumpPressed: a.jumpPressed || b.jumpPressed, attackPressed: a.attackPressed || b.attackPressed, dashPressed: a.dashPressed || b.dashPressed, confirm: a.confirm || b.confirm, pick: b.pick || a.pick, click: b.click || a.click, aimX: b.aimX ?? a.aimX } : b);
+
   function frame(now) {
     acc = Math.min(0.1, acc + (now - last) / 1000);
     last = now;
     const snap = input.snapshot();
     if (snap.mute) audio.toggleMute();
     if (snap.pause && g.state === 'playing') paused = !paused;
+    carry = paused ? null : merge(carry, snap);
     if (!paused) {
       let first = true;
       while (acc >= STEP) {
-        step(g, first ? snap : { ...snap, jumpPressed: false, attackPressed: false, dashPressed: false, confirm: false, pick: 0, click: null }, STEP);
+        step(g, first ? carry : { ...carry, jumpPressed: false, attackPressed: false, dashPressed: false, confirm: false, pick: 0, click: null }, STEP);
+        if (first) carry = null;
         first = false;
         acc -= STEP;
         for (const ev of g.events) {

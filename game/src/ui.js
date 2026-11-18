@@ -56,6 +56,7 @@ export function drawHud(ctx, g) {
     ctx.fillRect(18 + i * 26, 68, 22, 22);
     text(ctx, up, 29 + i * 26, 84, 14, COLOR.teal, 'center', '800');
   });
+  if (g.roomIndex === 0 && g.roomTime < 9 && g.state === 'playing') shadowed(ctx, 'J strike   K dash   W jump, again in the air   Three strikes in a row land a heavy blow', W / 2, H - 16, 15, COLOR.dim, 'center', '600');
   const boss = g.foes.find((f) => f.kind === 'warden');
   if (boss) {
     panel(ctx, W / 2 - 220, H - 44, 440, 22, 0.7);
