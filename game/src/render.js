@@ -4,7 +4,7 @@ import { COLOR, GROUND_Y, H, PLAYER, W } from './config.js';
 import { DOOR } from './game.js';
 
 /** The hero and the small foes are drawn a little larger than their hit boxes so they read at a glance. */
-const SPRITE = 1.3;
+const SPRITE = 1.15;
 
 /** Each chamber tints the lower sky differently, so the descent has a sense of depth. */
 const SKY_BOTTOM = [COLOR.skyBottom, '#12304a', '#243a22', '#3a2a14'];
@@ -139,6 +139,48 @@ function drawHusk(ctx, f, t) {
   ctx.restore();
 }
 
+function drawGuard(ctx, f, t) {
+  ctx.save();
+  ctx.translate(f.x + f.w / 2, f.y + f.h);
+  ctx.scale(f.face * SPRITE, SPRITE);
+  const down = f.broken > 0;
+  rect(ctx, -9, -10, 7, 10, "#2a2540");
+  rect(ctx, 3, -10, 7, 10, "#2a2540");
+  ctx.fillStyle = "#4b4470";
+  ctx.beginPath(); ctx.moveTo(-13, -10); ctx.lineTo(-10, -34); ctx.lineTo(8, -36); ctx.lineTo(13, -10); ctx.closePath(); ctx.fill();
+  rect(ctx, -9, -44, 18, 11, "#6a5f96");
+  rect(ctx, 2, -40, 6, 3, down ? COLOR.dim : COLOR.ember);
+  ctx.fillStyle = down ? "#4a5470" : "#8ea6d0";
+  ctx.strokeStyle = down ? "#2f3650" : "#d7e6ff";
+  ctx.lineWidth = 2;
+  const sx = down ? 4 : 11;
+  ctx.beginPath(); ctx.roundRect(sx, down ? -22 : -38, 10, down ? 16 : 34, 3); ctx.fill(); ctx.stroke();
+  if (down) { ctx.fillStyle = COLOR.emberHot; for (let i = 0; i < 3; i++) ctx.fillRect(-8 + i * 8, -52 + Math.sin(t * 9 + i) * 3, 3, 3); }
+  ctx.restore();
+}
+
+function drawCharger(ctx, f, t) {
+  const tele = f.mode === "tele";
+  const charging = f.mode === "charge";
+  const jitter = tele ? Math.sin(t * 70) * 1.5 : 0;
+  ctx.save();
+  ctx.translate(f.x + f.w / 2 + jitter, f.y + f.h);
+  ctx.scale(f.dir * SPRITE, SPRITE);
+  if (charging) for (let i = 1; i <= 3; i++) { ctx.globalAlpha = 0.18 * (4 - i); rect(ctx, -22 - i * 14, -22, 30, 18, COLOR.ember); }
+  ctx.globalAlpha = 1;
+  const run = charging ? Math.sin(t * 40) * 3 : Math.sin(t * 8) * 1.5;
+  rect(ctx, -14, -7, 6, 7 + run, "#3b1d24");
+  rect(ctx, 8, -7, 6, 7 - run, "#3b1d24");
+  ctx.fillStyle = tele ? "#a8323f" : f.mode === "dazed" ? "#5b4a52" : "#5e2a33";
+  ctx.beginPath(); ctx.ellipse(0, -14, 20, 12, 0, 0, 6.283); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(14, -16); ctx.lineTo(30, -22); ctx.lineTo(16, -8); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#e8dcc2";
+  ctx.beginPath(); ctx.moveTo(24, -20); ctx.lineTo(36, -30); ctx.lineTo(28, -16); ctx.closePath(); ctx.fill();
+  rect(ctx, 20, -20, 4, 4, tele || charging ? COLOR.blood : COLOR.ember);
+  if (f.mode === "dazed") { ctx.fillStyle = COLOR.emberHot; for (let i = 0; i < 3; i++) ctx.fillRect(-10 + i * 10, -34 + Math.sin(t * 9 + i) * 3, 3, 3); }
+  ctx.restore();
+}
+
 function drawArcher(ctx, f) {
   ctx.save();
   ctx.translate(f.x + f.w / 2, f.y + f.h);
@@ -189,6 +231,8 @@ function drawFoes(ctx, g) {
     const arriving = g.roomTime < 0.8;
     ctx.globalAlpha = arriving ? 0.25 + 0.75 * (g.roomTime / 0.8) : 1;
     if (f.kind === 'husk') drawHusk(ctx, f, g.time);
+    else if (f.kind === 'guard') drawGuard(ctx, f, g.time);
+    else if (f.kind === 'charger') drawCharger(ctx, f, g.time);
     else if (f.kind === 'archer') drawArcher(ctx, f);
     else if (f.kind === 'bat') drawBat(ctx, f, g.time);
     else drawWarden(ctx, f, g.time);
@@ -231,6 +275,16 @@ function drawPickups(ctx, g) {
   }
 }
 
+function drawRings(ctx, g) {
+  for (const q of g.rings) {
+    ctx.globalAlpha = Math.max(0, q.life / q.total) * 0.8;
+    ctx.strokeStyle = q.color;
+    ctx.lineWidth = 4 * (q.life / q.total) + 1;
+    ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, 6.283); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
 function drawPops(ctx, g) {
   ctx.textAlign = 'center';
   for (const q of g.pops) {
@@ -254,11 +308,26 @@ function drawParticles(ctx, g) {
 }
 
 /** Draw one frame of the world. The caller has already set the transform that maps 960 by 540 onto the canvas. */
+const ZOOM = 1.25;
+
+/** The camera: zoomed in on the hero while playing (the whole arena on the title screen), easing after him sideways. */
+function camera(g) {
+  if (g.state === 'title' || !g.room) return { x: 0, y: 0, z: 1 };
+  const vw = W / ZOOM;
+  const target = Math.max(0, Math.min(W - vw, g.player.x + g.player.w / 2 - vw / 2));
+  if (!g.cam) g.cam = { x: target, y: H - H / ZOOM, z: ZOOM };
+  else g.cam.x += (target - g.cam.x) * 0.12;
+  return g.cam;
+}
+
 export function drawWorld(ctx, g) {
+  const cam = camera(g);
   const sx = g.shake > 0 ? (Math.sin(g.time * 90) * g.shake * 9) : 0;
   const sy = g.shake > 0 ? (Math.cos(g.time * 77) * g.shake * 7) : 0;
   ctx.save();
   ctx.translate(sx, sy);
+  ctx.scale(cam.z, cam.z);
+  ctx.translate(-cam.x, -cam.y);
   drawBackground(ctx, g);
   if (g.room) {
     drawPlatforms(ctx, g.room);
@@ -269,6 +338,7 @@ export function drawWorld(ctx, g) {
     drawShots(ctx, g);
   }
   drawParticles(ctx, g);
+  drawRings(ctx, g);
   drawPops(ctx, g);
   ctx.restore();
   const vignette = ctx.createRadialGradient(W / 2, H / 2, H * 0.45, W / 2, H / 2, H * 0.95);

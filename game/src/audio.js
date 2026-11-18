@@ -1,8 +1,9 @@
 // All sound is synthesised with the Web Audio API: no audio files. Effects are short oscillator and noise
 // bursts; the music is a slow minor-key loop whose tempo rises in the boss chamber.
 const NOTE = (semi) => 55 * Math.pow(2, semi / 12); // semitones above A1
-const BASS = [0, 0, 7, 5, 0, 0, 10, 8];
-const LEAD = [24, null, 27, null, 31, null, 29, 27, 24, null, 22, null, 19, null, 22, null];
+// A driving D minor loop: 16 steps to a bar. The bass moves every second step, the lead plays the gaps.
+const BASS = [5, 5, 8, 5, 10, 10, 8, 3];
+const LEAD = [29, null, 33, null, 36, null, 33, null, 31, null, 34, null, 38, 34, 31, null];
 
 export function createAudio() {
   let ctx = null;
@@ -57,7 +58,11 @@ export function createAudio() {
 
   const EFFECTS = {
     swing: () => { noise(0.12, 0.14, 1800, 'highpass'); tone(320, 170, 0.1, 'sawtooth', 0.06); },
-    hit: () => { noise(0.08, 0.22, 2600); tone(170, 70, 0.12, 'square', 0.16); },
+    hit: () => { noise(0.08, 0.22, 2600); tone(170, 70, 0.12, 'square', 0.16); tone(110, 45, 0.16, 'sine', 0.28); },
+    smash: () => { noise(0.14, 0.3, 3200); tone(150, 50, 0.2, 'square', 0.2); tone(80, 32, 0.3, 'sine', 0.4); },
+    clang: () => { tone(1400, 1100, 0.14, 'triangle', 0.16); tone(2100, 1700, 0.1, 'sine', 0.08); noise(0.05, 0.12, 5000, 'highpass'); },
+    break: () => { arp([880, 660, 440], 0.04, 'square', 0.12); noise(0.2, 0.25, 1500); tone(120, 40, 0.25, 'sine', 0.3); },
+    rush: () => { noise(0.3, 0.2, 600, 'bandpass'); tone(140, 90, 0.3, 'sawtooth', 0.08); },
     kill: () => { tone(240, 50, 0.3, 'sawtooth', 0.16); noise(0.22, 0.2, 900); },
     hurt: () => { tone(320, 80, 0.3, 'square', 0.2); noise(0.15, 0.18, 700); },
     jump: () => tone(280, 560, 0.12, 'sine', 0.12),
@@ -80,10 +85,18 @@ export function createAudio() {
 
   function musicStep() {
     if (!ctx || muted) return;
-    const b = BASS[beat % BASS.length];
-    if (beat % 2 === 0) tone(NOTE(b), NOTE(b) * 0.99, 0.4, 'triangle', 0.1);
-    const l = LEAD[beat % LEAD.length];
-    if (l !== null && l !== undefined) tone(NOTE(l + b * 0), NOTE(l) * 1.005, 0.3, boss ? 'sawtooth' : 'sine', boss ? 0.035 : 0.045);
+    const s = beat % 16;
+    const bar = Math.floor(beat / 16);
+    if (s % 4 === 0) tone(130, 42, 0.14, 'sine', 0.24); // kick
+    if (s === 4 || s === 12) noise(0.1, 0.09, 1800, 'bandpass'); // snare
+    if (s % 2 === 1) noise(0.03, 0.04, 7500, 'highpass'); // hat
+    if (s % 2 === 0) {
+      const b = BASS[(s / 2 + (bar % 2) * 2) % BASS.length];
+      tone(NOTE(b), NOTE(b) * 0.99, 0.28, 'triangle', 0.12);
+      if (boss) tone(NOTE(b + 12), NOTE(b + 12), 0.2, 'sawtooth', 0.03);
+    }
+    const l = LEAD[s];
+    if (l !== null && l !== undefined && bar % 4 !== 3) tone(NOTE(l), NOTE(l) * 1.004, 0.26, boss ? 'sawtooth' : 'square', boss ? 0.035 : 0.028);
     beat += 1;
   }
 
@@ -92,12 +105,12 @@ export function createAudio() {
     unlock() {
       ensure();
       if (ctx && ctx.state === 'suspended') ctx.resume();
-      if (ctx && !timer) timer = setInterval(musicStep, 230);
+      if (ctx && !timer) timer = setInterval(musicStep, 150);
     },
     play(name) {
       if (EFFECTS[name]) EFFECTS[name]();
     },
-    setBoss(on) { if (boss !== on) { boss = on; if (timer) { clearInterval(timer); timer = setInterval(musicStep, on ? 170 : 230); } } },
+    setBoss(on) { if (boss !== on) { boss = on; if (timer) { clearInterval(timer); timer = setInterval(musicStep, on ? 118 : 150); } } },
     toggleMute() {
       muted = !muted;
       if (master) master.gain.value = muted ? 0 : 0.6;

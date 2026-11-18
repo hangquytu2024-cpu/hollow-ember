@@ -16,15 +16,17 @@ export const FOES = {
   husk: { w: 28, h: 30, hp: 30, speed: 62, touch: 1, score: 10 },
   archer: { w: 22, h: 34, hp: 22, speed: 0, touch: 1, score: 15, fireEvery: 2.1 },
   bat: { w: 26, h: 20, hp: 14, speed: 120, touch: 1, score: 12, swoopEvery: 2.8 },
+  guard: { w: 30, h: 36, hp: 60, speed: 46, touch: 1, score: 25 }, // a shield that blocks blows from the front
+  charger: { w: 36, h: 26, hp: 30, speed: 34, touch: 1, score: 20 }, // winds up, then rams along its ledge
   warden: { w: 74, h: 92, hp: 380, speed: 0, touch: 1, score: 200 },
 };
 
 /** Which foes appear in chamber `index` (0 based), as a pool the room generator draws from. */
 export const POOLS = [
   ['husk', 'husk', 'bat'],
-  ['husk', 'archer', 'bat', 'husk'],
-  ['husk', 'archer', 'bat', 'archer', 'husk'],
-  ['husk', 'archer', 'bat', 'bat', 'archer', 'husk'],
+  ['husk', 'charger', 'bat', 'archer'],
+  ['husk', 'guard', 'charger', 'archer', 'bat'],
+  ['guard', 'charger', 'archer', 'bat', 'husk', 'guard'],
 ];
 
 /** The upgrades offered between chambers. Each one changes the hero's stats once. */
@@ -42,6 +44,6 @@ export const UPGRADES = [
 export const CARDS = [0, 1, 2].map((i) => ({ x: 90 + i * 270, y: 150, w: 240, h: 250 }));
 
 export const COLOR = {
-  skyTop: '#0a0f1d', skyBottom: '#2a1330', stone: '#1b2130', stoneTop: '#3a465e', ember: '#ff8a3d', emberHot: '#ffd36b',
+  skyTop: '#0e1530', skyBottom: '#2e1636', stone: '#232d44', stoneTop: '#6a7fa8', ember: '#ff8a3d', emberHot: '#ffd36b',
   teal: '#5ee6d1', blood: '#ff4d5e', text: '#f3ecdf', dim: '#9a93a8', gold: '#ffd36b',
 };

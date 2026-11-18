@@ -14,7 +14,7 @@ const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h 
 
 export function createGame(seed = 1) {
   return {
-    seed, rng: makeRng(seed), state: 'title', time: 0, best: 0, events: [], parts: [], pops: [], shake: 0, freeze: 0, endT: 0, runs: 0,
+    seed, rng: makeRng(seed), state: 'title', time: 0, best: 0, events: [], parts: [], pops: [], rings: [], cam: null, shake: 0, freeze: 0, endT: 0, runs: 0,
     roomIndex: 0, room: null, player: createPlayer(), foes: [], shots: [], pickups: [], offers: [], taken: [], score: 0, kills: 0,
     roomTime: 0, runTime: 0, doorOpen: false, victoryT: 0,
   };
@@ -31,6 +31,8 @@ export function startRun(g, seed = g.seed + g.runs) {
   g.victoryT = 0;
   g.parts.length = 0;
   g.pops.length = 0;
+  g.rings.length = 0;
+  g.cam = null;
   loadRoom(g, 0);
   g.state = 'playing';
   g.events.push('start');
@@ -97,6 +99,8 @@ function killFoe(g, f) {
   g.kills += 1;
   g.score += FOES[f.kind].score;
   burst(g, f.x + f.w / 2, f.y + f.h / 2, '#ffb15e', f.kind === 'warden' ? 60 : 18, f.kind === 'warden' ? 420 : 280, 4);
+  ring(g, f.x + f.w / 2, f.y + f.h / 2, f.kind === 'warden' ? 150 : 74, '#ff9a4d');
+  g.shake = Math.max(g.shake, f.kind === 'warden' ? 0.6 : 0.22);
   g.events.push('kill');
   const p = g.player;
   if (f.kind === 'warden') {
@@ -114,19 +118,53 @@ function killFoe(g, f) {
   }
 }
 
-function damageFoe(g, f, dmg, dir) {
+/** A ring that spreads and fades: the shock of a heavy hit or a kill. */
+function ring(g, x, y, size, color) {
+  g.rings.push({ x, y, r: 6, max: size, life: 0.28, total: 0.28, color });
+}
+
+/**
+ * A blow lands on a foe. `dir` is the way the blow travels (-1 left, 1 right); `heavy` marks the third
+ * hit of the combo. A guard blocks light blows from the front and has its shield broken by a heavy one.
+ */
+function damageFoe(g, f, dmg, dir, heavy = false) {
+  const cx = f.x + f.w / 2;
+  const cy = f.y + f.h / 2;
+  if (f.kind === 'guard' && f.broken <= 0) {
+    if (f.face === -dir && !heavy) {
+      f.flash = 0.08;
+      f.hp -= dmg * 0.2;
+      f.x = Math.max(f.platform.x, Math.min(f.platform.x + f.platform.w - f.w, f.x + dir * 6));
+      burst(g, cx - f.face * 14, cy, '#9be8ff', 8, 240, 2);
+      g.pops.push({ x: cx, y: f.y - 4, text: 'BLOCK', life: 0.6, big: false });
+      g.events.push('clang');
+      g.freeze = Math.max(g.freeze, 0.03);
+      g.shake = Math.max(g.shake, 0.1);
+      if (f.hp <= 0) killFoe(g, f);
+      return;
+    }
+    if (f.face === -dir && heavy) {
+      f.broken = 1.6;
+      f.stagger = 0.7;
+      g.pops.push({ x: cx, y: f.y - 22, text: 'GUARD BREAK', life: 0.9, big: true });
+      g.events.push('break');
+    }
+  }
   f.hp -= dmg;
   f.flash = 0.12;
   g.score += 1;
   if (f.kind !== 'warden') {
-    f.stagger = 0.22;
-    if (f.kind === 'bat') { f.mode = 'idle'; f.t = Math.max(f.t, 0.8); }
-    else f.x = Math.max(f.platform.x, Math.min(f.platform.x + f.platform.w - f.w, f.x + dir * 14));
+    f.stagger = Math.max(f.stagger, heavy ? 0.4 : 0.22);
+    if (f.kind === 'bat') { f.mode = 'idle'; f.t = Math.max(f.t, 0.8); f.x = Math.max(0, f.x + dir * (heavy ? 44 : 26)); }
+    else f.x = Math.max(f.platform.x, Math.min(f.platform.x + f.platform.w - f.w, f.x + dir * (heavy ? 30 : 18)));
+    if (f.kind === 'charger' && f.mode !== 'dazed') { f.mode = 'dazed'; f.t = 0.7; }
   }
-  burst(g, f.x + f.w / 2, f.y + f.h / 2, '#ffe2a8', 7, 220);
-  g.pops.push({ x: f.x + f.w / 2, y: f.y - 4, text: String(Math.round(dmg)), life: 0.7, big: dmg >= 16 });
-  g.events.push('hit');
-  g.freeze = Math.max(g.freeze, f.hp <= 0 ? 0.07 : 0.04);
+  burst(g, cx, cy, '#ffe2a8', heavy ? 16 : 9, heavy ? 340 : 240, heavy ? 4 : 3);
+  if (heavy) ring(g, cx, cy, 52, '#ffd36b');
+  g.pops.push({ x: cx, y: f.y - 4, text: String(Math.round(dmg)), life: 0.7, big: dmg >= 16 });
+  g.events.push(heavy ? 'smash' : 'hit');
+  g.freeze = Math.max(g.freeze, f.hp <= 0 ? 0.1 : heavy ? 0.085 : 0.05);
+  g.shake = Math.max(g.shake, heavy ? 0.3 : 0.12);
   if (f.hp <= 0) killFoe(g, f);
 }
 
@@ -164,6 +202,12 @@ function updatePickups(g, dt) {
 }
 
 function updateParts(g, dt) {
+  for (let i = g.rings.length - 1; i >= 0; i--) {
+    const q = g.rings[i];
+    q.life -= dt;
+    q.r = 6 + (q.max - 6) * (1 - q.life / q.total);
+    if (q.life <= 0) g.rings.splice(i, 1);
+  }
   for (let i = g.pops.length - 1; i >= 0; i--) {
     const q = g.pops[i];
     q.life -= dt;
@@ -190,7 +234,7 @@ function swordPhase(g) {
   for (const f of g.foes.slice()) {
     if (!p.hit.has(f) && overlap(box, f)) {
       p.hit.add(f);
-      damageFoe(g, f, swingDamage(p), p.face);
+      damageFoe(g, f, swingDamage(p), p.face, p.combo === 2);
     }
   }
   for (let i = g.shots.length - 1; i >= 0; i--) {
@@ -255,6 +299,8 @@ export function step(g, input, dt) {
   const p = g.player;
   movePlayer(p, input, g.room.platforms, dt, g.events);
   if (p.justLanded) { g.events.push('land'); burst(g, p.x + p.w / 2, p.y + p.h, '#8a8fa8', 5, 90, 2, 200); }
+  if (g.events.includes('jump')) burst(g, p.x + p.w / 2, p.y + p.h, '#8a8fa8', 4, 80, 2, 200);
+  if (p.dashT > 0) burst(g, p.x + p.w / 2 - p.dashDir * 12, p.y + p.h / 2, '#5ee6d1', 2, 50, 3, 0);
   swordPhase(g);
 
   if (g.roomTime > SPAWN_DELAY) {

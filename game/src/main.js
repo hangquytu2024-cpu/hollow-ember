@@ -75,6 +75,7 @@ function play() {
     acc = Math.min(0.1, acc + (now - last) / 1000);
     last = now;
     const snap = input.snapshot();
+    if (snap.aimX !== null && g.cam) snap.aimX = g.cam.x + snap.aimX / g.cam.z; // a click is on the screen, the sword aims in the world
     if (snap.mute) audio.toggleMute();
     if (snap.pause && g.state === 'playing') paused = !paused;
     carry = paused ? null : merge(carry, snap);

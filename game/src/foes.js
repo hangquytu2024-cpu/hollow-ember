@@ -26,20 +26,51 @@ export function updateFoe(f, g, dt) {
   const px = p.x + p.w / 2;
   const cx = f.x + f.w / 2;
   f.face = px >= cx ? 1 : -1;
-  if (f.kind === 'husk') updateHusk(f, p, px, cx, dt);
+  f.broken = Math.max(0, (f.broken || 0) - dt);
+  if (f.kind === 'husk') updateHusk(f, p, px, cx, dt, FOES.husk.speed);
+  else if (f.kind === 'guard') updateHusk(f, p, px, cx, dt, FOES.guard.speed);
+  else if (f.kind === 'charger') updateCharger(f, g, p, px, cx, dt);
   else if (f.kind === 'archer') updateArcher(f, g, p, dt);
   else if (f.kind === 'bat') updateBat(f, g, p, px, dt);
   else updateWarden(f, g, p, dt);
 }
 
-function updateHusk(f, p, px, cx, dt) {
+/** Walkers (husks and guards): patrol their ledge, chase the hero when he is on it. */
+function updateHusk(f, p, px, cx, dt, speed) {
   const pl = f.platform;
   const sameLedge = Math.abs(p.y + p.h - pl.y) < 50 && px > pl.x - 20 && px < pl.x + pl.w + 20;
   const chase = sameLedge && Math.abs(px - cx) < 320;
   if (chase) f.dir = px > cx ? 1 : -1;
-  f.x += f.dir * FOES.husk.speed * (chase ? 1.6 : 1) * dt;
+  f.x += f.dir * speed * (chase ? 1.6 : 1) * dt;
   if (f.x < pl.x) { f.x = pl.x; f.dir = 1; }
   if (f.x + f.w > pl.x + pl.w) { f.x = pl.x + pl.w - f.w; f.dir = -1; }
+}
+
+/** The charger prowls, winds up with a warning, rams along its ledge, then is dazed and open to attack. */
+function updateCharger(f, g, p, px, cx, dt) {
+  const pl = f.platform;
+  const sameLedge = Math.abs(p.y + p.h - pl.y) < 50 && px > pl.x - 20 && px < pl.x + pl.w + 20;
+  f.t -= dt;
+  if (f.mode === 'idle') {
+    f.x += f.dir * FOES.charger.speed * dt;
+    if (f.t <= 0 && sameLedge && Math.abs(px - cx) < 420) {
+      f.mode = 'tele';
+      f.t = 0.55;
+      f.dir = px > cx ? 1 : -1;
+      g.events.push('screech');
+    }
+  } else if (f.mode === 'tele') {
+    if (f.t <= 0) { f.mode = 'charge'; f.t = 0.85; g.events.push('rush'); }
+  } else if (f.mode === 'charge') {
+    f.x += f.dir * 400 * dt;
+    if (f.t <= 0 || f.x <= pl.x || f.x + f.w >= pl.x + pl.w) { f.mode = 'dazed'; f.t = 0.9; }
+  } else if (f.t <= 0) {
+    f.mode = 'idle';
+    f.t = 1.2 + g.rng.range(0, 1);
+    f.dir = px > cx ? 1 : -1;
+  }
+  if (f.x < pl.x) { f.x = pl.x; if (f.mode === 'idle') f.dir = 1; }
+  if (f.x + f.w > pl.x + pl.w) { f.x = pl.x + pl.w - f.w; if (f.mode === 'idle') f.dir = -1; }
 }
 
 function updateArcher(f, g, p, dt) {
