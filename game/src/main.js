@@ -62,6 +62,7 @@ function play() {
   let last = performance.now();
   let acc = 0;
 
+  window.hollowEmber = g; // read only: lets a test script in the page watch the game while it plays
   const unlock = () => audio.unlock();
   window.addEventListener('keydown', unlock);
   canvas.addEventListener('mousedown', unlock);
@@ -81,7 +82,6 @@ function play() {
       let first = true;
       while (acc >= STEP) {
         step(g, first ? carry : { ...carry, jumpPressed: false, attackPressed: false, dashPressed: false, confirm: false, pick: 0, click: null }, STEP);
-        if (first) carry = null;
         first = false;
         acc -= STEP;
         for (const ev of g.events) {
@@ -89,6 +89,7 @@ function play() {
           if (ev === 'die' || ev === 'victory') saveBest(g.best);
         }
       }
+      if (!first) carry = null; // this frame's presses were used; with no step they wait for the next frame
       audio.setBoss(Boolean(g.room && g.room.boss && g.state === 'playing'));
     } else acc = 0;
     drawFrame(g, paused);
