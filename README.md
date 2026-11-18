@@ -13,7 +13,8 @@ It is all plain HTML, canvas and JavaScript modules. There are no libraries, no 
 - Run, jump (twice in the air, three times with Gale Boots) and swing a three hit sword combo. The third hit is wider and hits harder.
 - Dash to slip through anything. The dash makes you untouchable for a moment, and its cooldown shows on the HUD.
 - Swinging at an arrow knocks it out of the air.
-- Husks patrol their ledges, archers aim and fire, bats circle and then swoop. Every chamber is drawn from a seed, so the ledges and the foes change each descent.
+- Husks patrol their ledges, archers aim and fire, bats circle and then swoop. Guards carry a shield that stops light blows from the front: go round them, or land the third hit of a combo to break the guard. Chargers wind up with a warning, ram along their ledge and are left dazed. Every chamber is drawn from a seed, so the ledges and the foes change each descent.
+- Hits have weight: a short freeze on impact, screen shake, a ring of force on heavy blows and kills, and floating damage numbers.
 - After each chamber you choose one of three boons: a sharper blade, a faster dash, a second heart, a spark of fire with every swing, a life leech, wider reach, faster feet.
 - The Warden charges, leaps and slams the floor, and throws fans of fire. It gets faster when it is hurt.
 
