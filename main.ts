@@ -7,13 +7,29 @@
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 
-import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-game.ts';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+
+// Stop with a reason on what the scorer would refuse: it takes 3 or 4 screenshots, each at most 256 KiB.
+const SHOT_MAX_BYTES = 262144;
+const shotsDir = join(here, 'screenshots');
+const shotNames = existsSync(shotsDir) ? readdirSync(shotsDir).filter((name) => !name.startsWith('.')) : [];
+if (shotNames.length < 3 || shotNames.length > 4) {
+  process.stderr.write(`hollow ember: screenshots/ holds ${shotNames.length} images, the scorer takes 3 or 4\n`);
+  process.exit(1);
+}
+for (const name of shotNames) {
+  const bytes = statSync(join(shotsDir, name)).size;
+  if (bytes > SHOT_MAX_BYTES) {
+    process.stderr.write(`hollow ember: screenshots/${name} is ${bytes} bytes, the scorer takes at most ${SHOT_MAX_BYTES}\n`);
+    process.exit(1);
+  }
+}
 
 mkdirSync(out, { recursive: true });
 cpSync(join(here, 'game'), join(out, 'game'), { recursive: true });
